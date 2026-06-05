@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '/api/v1' })
+const api = axios.create({ baseURL: 'https://ignitecomp.onrender.com/api/v1' })
 
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('access_token')
@@ -37,7 +37,7 @@ export default api
 export const auth = {
   login: (username, password) => {
     const form = new URLSearchParams({ username, password })
-    return axios.post('/api/v1/auth/token', form, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+    return axios.post('https://ignitecomp.onrender.com/api/v1/auth/token', form, { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
   },
   me: () => api.get('/auth/me'),
 }
