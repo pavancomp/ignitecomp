@@ -5,7 +5,8 @@ asyncpg==0.29.0
 alembic==1.13.1
 pydantic==2.7.1
 pydantic-settings==2.2.1
-python-jose[cryptography]==3.3.0
+python-jose==3.3.0
+cryptography==41.0.7
 passlib==1.7.4
 bcrypt==4.0.1
 slowapi==0.1.9
