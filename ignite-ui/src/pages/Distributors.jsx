@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { distributors as api, products as productsApi, cycles as cyclesApi } from '../api'
+import { distributors as api, products as productsApi, cycles as cyclesApi, orders as ordersApi } from '../api'
 
 export default function Distributors() {
   const [items, setItems] = useState([])
@@ -219,12 +219,13 @@ function OrdersModal({ ba, onClose }) {
 
   const verifyOrder = async (orderId) => {
     try {
-      await fetch(`/api/v1/orders/${orderId}/verify`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
-      })
+      await ordersApi.verify(orderId)
+      setMsg({ text: 'Order verified ✓', ok: true })
       load()
-    } catch { /* ignore */ }
+    } catch (e) {
+      const detail = e.response?.data?.detail
+      setMsg({ text: detail || 'Failed to verify order', ok: false })
+    }
   }
 
   const statusColor = s => ({
