@@ -50,6 +50,12 @@ export const distributors = {
   getCenters: (id) => api.get(`/distributors/${id}/centers`),
   activateCenters: (id, params) => api.post(`/distributors/${id}/centers`, null, { params }),
   tree: () => api.get('/distributors/tree/nodes'),
+  getOrders: (id) => api.get(`/distributors/${id}/orders`),
+  addOrder: (id, params) => api.post(`/distributors/${id}/orders`, null, { params }),
+}
+
+export const products = {
+  list: () => api.get('/config/products'),
 }
 
 export const orders = {

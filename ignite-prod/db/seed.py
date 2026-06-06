@@ -12,7 +12,8 @@ pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 async def seed_all(db: AsyncSession) -> None:
     await _seed_plan_config(db); await _seed_rank_config(db)
     await _seed_products(db); await _seed_admin_users(db)
-    await _seed_tree_root(db); await db.commit()
+    await _seed_tree_root(db); await _seed_sample_data(db)
+    await db.commit()
     print("✓ Seed complete")
 
 
@@ -62,3 +63,75 @@ async def _seed_tree_root(db):
     root_center = TrackingCenter(distributor_id=root_ba.id, center_number=1, position_id=root_pos.id, is_active=True)
     db.add(root_center); await db.flush()
     db.add(CoinBalance(distributor_id=root_ba.id))
+
+
+async def _seed_sample_data(db: AsyncSession) -> None:
+    """3 sample BAs with centers, 1 open cycle, 1 order each. Safe to rerun."""
+    from db.models import (
+        TrackingCenter, TreePosition, CoinBalance,
+        Cycle, Order, OrderItem, OrderStatus, OrderType, CycleStatus
+    )
+    import uuid
+    from datetime import date, timedelta
+
+    if (await db.execute(
+        select(Distributor).where(Distributor.distributor_id == "BA-DEMO-01")
+    )).scalar_one_or_none():
+        return
+
+    root_center = (await db.execute(
+        select(TrackingCenter).where(TrackingCenter.center_number == 1).limit(1)
+    )).scalar_one_or_none()
+    if not root_center or not root_center.position_id:
+        return
+
+    sample_bas_data = [
+        dict(distributor_id="BA-DEMO-01", full_name="Rahul Verma",   email="rahul@ignite.demo",  phone="9876543210"),
+        dict(distributor_id="BA-DEMO-02", full_name="Priya Singh",   email="priya@ignite.demo",  phone="9876543211"),
+        dict(distributor_id="BA-DEMO-03", full_name="Amit Sharma",   email="amit@ignite.demo",   phone="9876543212"),
+    ]
+    created_bas = []
+    for bd in sample_bas_data:
+        ba = Distributor(**bd, status=DistributorStatus.ACTIVE, joined_date=date.today())
+        db.add(ba); await db.flush()
+        db.add(CoinBalance(distributor_id=ba.id))
+        created_bas.append(ba)
+
+    # Place each BA's primary center under root
+    for i, ba in enumerate(created_bas):
+        legs = ["left", "right", None]
+        leg = legs[i] if i < 2 else None
+        parent_id = root_center.position_id if i < 2 else None
+        # For BA-DEMO-03, find first available BFS slot
+        if leg:
+            pos = TreePosition(parent_id=parent_id, leg=leg, depth=1, path=f"root.{ba.id}")
+        else:
+            # Simple: put under BA-DEMO-01's center
+            from engine.tree import _bfs_place as _bfs
+            pos = await _bfs(db, root_center.position_id, None)
+        if leg:
+            db.add(pos); await db.flush()
+        center = TrackingCenter(distributor_id=ba.id, center_number=1, position_id=pos.id, is_active=True)
+        db.add(center); await db.flush()
+
+    today = date.today()
+    cycle = Cycle(
+        cycle_code=f"W{today.year}-DEMO", cycle_type="weekly",
+        start_date=today, end_date=today + timedelta(days=6),
+        status=CycleStatus.OPEN,
+    )
+    db.add(cycle); await db.flush()
+
+    prod = (await db.execute(select(Product).limit(1))).scalar_one_or_none()
+    if prod:
+        for ba in created_bas:
+            o = Order(
+                order_ref=f"ORD-D-{uuid.uuid4().hex[:6].upper()}",
+                distributor_id=ba.id, cycle_id=cycle.id,
+                order_type=OrderType.BA_PURCHASE, status=OrderStatus.PENDING,
+                amount_inr=prod.ba_price_inr, cv_total=prod.cv, order_date=today,
+            )
+            db.add(o); await db.flush()
+            db.add(OrderItem(order_id=o.id, product_id=prod.id, quantity=1,
+                              unit_price_inr=prod.ba_price_inr, cv_per_unit=prod.cv))
+    print("✓ Sample data: 3 demo BAs, 1 open cycle, 3 orders")

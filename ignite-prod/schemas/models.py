@@ -1,20 +1,24 @@
-"""
-Pydantic schemas — request / response models.
-India-specific validation: PAN, IFSC, phone (Indian mobile numbers).
-"""
-
 import re
 from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
-# ── Validators ────────────────────────────────────────────────────────────
-
 PAN_RE   = re.compile(r"^[A-Z]{5}[0-9]{4}[A-Z]$")
 IFSC_RE  = re.compile(r"^[A-Z]{4}0[A-Z0-9]{6}$")
-PHONE_RE = re.compile(r"^[6-9]\d{9}$")     # Indian mobile: 6–9 prefix, 10 digits
+PHONE_RE = re.compile(r"^[6-9]\d{9}$")
 GSTIN_RE = re.compile(r"^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$")
+
+
+def _clean_phone(v: str) -> str:
+    """Strip +91 prefix or leading 0, leaving exactly 10 digits."""
+    v = v.strip()
+    if v.startswith("+91"):
+        v = v[3:]
+    elif v.startswith("91") and len(v) == 12:
+        v = v[2:]
+    elif v.startswith("0"):
+        v = v[1:]
+    return v
 
 
 # ── Auth ──────────────────────────────────────────────────────────────────
@@ -58,36 +62,33 @@ class DistributorCreate(BaseModel):
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
-        v = v.strip().lstrip("+91").lstrip("0")
+        v = _clean_phone(v)
         if not PHONE_RE.match(v):
-            raise ValueError("Phone must be a valid 10-digit Indian mobile number (6–9 prefix)")
+            raise ValueError("Must be a valid 10-digit Indian mobile number (starts 6–9)")
         return v
 
     @field_validator("pan_number")
     @classmethod
     def validate_pan(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
+        if not v: return v
         v = v.upper().strip()
         if not PAN_RE.match(v):
-            raise ValueError("PAN must be 10-character alphanumeric in format AAAAA9999A")
+            raise ValueError("PAN must be 10 chars: AAAAA9999A")
         return v
 
     @field_validator("ifsc_code")
     @classmethod
     def validate_ifsc(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
+        if not v: return v
         v = v.upper().strip()
         if not IFSC_RE.match(v):
-            raise ValueError("IFSC must be 11 characters: 4 letters + 0 + 6 alphanumeric")
+            raise ValueError("IFSC must be 11 chars: AAAA0XXXXXX")
         return v
 
     @field_validator("gstin")
     @classmethod
     def validate_gstin(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
+        if not v: return v
         v = v.upper().strip()
         if not GSTIN_RE.match(v):
             raise ValueError("GSTIN format invalid")
@@ -106,11 +107,10 @@ class DistributorUpdate(BaseModel):
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: Optional[str]) -> Optional[str]:
-        if v is None:
-            return v
-        v = v.strip().lstrip("+91").lstrip("0")
+        if not v: return v
+        v = _clean_phone(v)
         if not PHONE_RE.match(v):
-            raise ValueError("Phone must be a valid 10-digit Indian mobile number")
+            raise ValueError("Must be a valid 10-digit Indian mobile number")
         return v
 
 
@@ -187,6 +187,7 @@ class CycleOut(BaseModel):
     total_payout_inr: int
     total_tds_inr: int
     distributor_count: int
+    center_count: int
     closed_at: Optional[datetime]
     approved_at: Optional[datetime]
     created_at: datetime
@@ -197,6 +198,8 @@ class CycleOut(BaseModel):
 
 class CommissionOut(BaseModel):
     id: int
+    center_id: Optional[int]          # which tracking center
+    center_number: Optional[int] = None  # populated via join in endpoint
     distributor_id: int
     cycle_id: int
     rank_at_cycle: Optional[str]
@@ -284,15 +287,6 @@ class RankConfigUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
-# ── Pagination ────────────────────────────────────────────────────────────
-
-class PaginatedResponse(BaseModel):
-    total: int
-    page: int
-    page_size: int
-    items: list
-
-
 # ── Tracking center ────────────────────────────────────────────────────────
 
 class TrackingCenterOut(BaseModel):
@@ -319,3 +313,12 @@ class TreeNodeOut(BaseModel):
     center_number: Optional[int]
     left_cv: Optional[int] = None
     right_cv: Optional[int] = None
+
+
+# ── Pagination ────────────────────────────────────────────────────────────
+
+class PaginatedResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list

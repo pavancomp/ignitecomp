@@ -61,3 +61,12 @@ async def update_rank_config(
     await write_audit(db, current_user.id, "update_rank_config", "RankConfig", rank_id,
                       old_value=old, new_value=body.model_dump(exclude_none=True), request=request)
     return rank
+
+
+@router.get("/products")
+async def list_products(db: AsyncSession = Depends(get_db), _: AdminUser = Depends(require_viewer)):
+    from db.models import Product
+    rows = (await db.execute(select(Product).where(Product.is_active == True))).scalars().all()
+    return [{"id": p.id, "sku": p.sku, "name": p.name,
+             "ba_price_inr": p.ba_price_inr, "cv": p.cv,
+             "coins_awarded": p.coins_awarded} for p in rows]
