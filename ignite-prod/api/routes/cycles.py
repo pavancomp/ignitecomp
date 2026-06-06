@@ -55,14 +55,14 @@ async def close_cycle(cycle_id: int, background_tasks: BackgroundTasks,
         raise HTTPException(status_code=400, detail=f"Cycle is {cycle.status} — must be OPEN to close")
 
     # Mark processing BEFORE spawning task — prevents race condition on double-click
-    cycle.status = "processing"
+    cycle.status = CycleStatus.PROCESSING
     await db.flush()
     await write_audit(db, current_user.id, "cycle_close_initiated", "Cycle", cycle_id, request=request)
 
     background_tasks.add_task(run_cycle_close, cycle_id=cycle_id,
                                actor_id=current_user.id, session_factory=AsyncSessionLocal)
     return {"message": "Cycle close started. Poll GET /cycles/{cycle_id} for status.",
-            "cycle_id": cycle_id, "status": "processing"}
+            "cycle_id": cycle_id, "status": "processing"}  # noqa
 
 
 @router.post("/{cycle_id}/approve", response_model=CycleOut)

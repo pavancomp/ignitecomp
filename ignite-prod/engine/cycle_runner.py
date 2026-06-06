@@ -38,7 +38,7 @@ async def run_cycle_close(cycle_id, actor_id, session_factory):
                                     status="error"))
                 # Also reset status to open so it can be retried
                 cycle = await db2.get(Cycle, cycle_id)
-                if cycle and cycle.status == "processing":
+                if cycle and cycle.status == CycleStatus.PROCESSING:
                     cycle.status = CycleStatus.OPEN
                 await db2.commit()
 

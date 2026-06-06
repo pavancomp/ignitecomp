@@ -17,7 +17,7 @@ from db.connection import Base
 
 
 class CycleStatus(str, enum.Enum):
-    OPEN = "open"; CLOSED = "closed"; APPROVED = "approved"; CANCELLED = "cancelled"
+    OPEN = "open"; PROCESSING = "processing"; CLOSED = "closed"; APPROVED = "approved"; CANCELLED = "cancelled"
 
 class DistributorStatus(str, enum.Enum):
     ACTIVE = "active"; INACTIVE = "inactive"; TERMINATED = "terminated"; PENDING_KYC = "pending_kyc"
